@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal Weather App</title>
+    <style>
+        :root {
+            --bg-color: #f0f4f8;
+            --card-color: #ffffff;
+            --text-color: #333333;
+            --accent-color: #0076ff;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .weather-card {
+            background: var(--card-color);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+        input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        button {
+            padding: 12px 20px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .weather-info {
+            margin-top: 20px;
+        }
+        .location {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .temp {
+            font-size: 48px;
+            font-weight: bold;
+            color: var(--accent-color);
+            margin: 15px 0;
+        }
+        .desc {
+            font-size: 18px;
+            text-transform: capitalize;
+            color: #666;
+        }
+        .details {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            font-size: 14px;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+
+<div class="weather-card">
+    <div class="search-box">
+        <input type="text" id="city-input" placeholder="Enter city name...">
+        <button id="search-btn">Search</button>
+    </div>
+    
+    <div class="weather-info" id="weather-info">
+        <div class="location" id="location-name">Detecting location...</div>
+        <div class="temp" id="temp-display">--°C</div>
+        <div class="desc" id="weather-desc">Loading data...</div>
+        
+        <div class="details">
+            <div>💨 Wind: <span id="wind-speed">--</span> km/h</div>
+            <div>💧 Humidity: <span id="humidity">--</span>%</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Weather WMO Code mapping to human-readable text
+    const weatherCodes = {
+        0: 'Clear sky', 1: 'Mainly clear', 2: 'Partly cloudy', 3: 'Overcast',
+        45: 'Fog', 48: 'Depositing rime fog', 51: 'Light drizzle', 53: 'Moderate drizzle',
+        55: 'Dense drizzle', 61: 'Slight rain', 63: 'Moderate rain', 65: 'Heavy rain',
+        71: 'Slight snow', 73: 'Moderate snow', 75: 'Heavy snow', 95: 'Thunderstorm'
+    };
+
+    // On load, try getting local weather
+    window.addEventListener('DOMContentLoaded', () => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => fetchWeatherByCoords(position.coords.latitude, position.coords.longitude, "Your Location"),
+                () => fetchWeatherByCity('Delhi') // Fallback city
+            );
+        } else {
+            fetchWeatherByCity('Delhi');
+        }
+    });
+
+    document.getElementById('search-btn').addEventListener('click', () => {
+        const city = document.getElementById('city-input').value;
+        if (city) fetchWeatherByCity(city);
+    });
+
+    // Fetch using coordinates (Auto-location)
+    async function fetchWeatherByCoords(lat, lon, locationLabel) {
+        try {
+            const res = await fetch(`https://open-meteo.com{lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m`);
+            const data = await res.json();
+            updateUI(data.current, locationLabel);
+        } catch (err) {
+            document.getElementById('weather-desc').innerText = "Error loading weather data.";
+        }
+    }
+
+    // Fetch using Geocoding API + Weather API (Manual search)
+    async function fetchWeatherByCity(cityName) {
+        try {
+            document.getElementById('location-name').innerText = "Searching...";
+            const geoRes = await fetch(`https://open-meteo.com{cityName}&count=1&language=en&format=json`);
+            const geoData = await geoRes.json();
+            
+            if (!geoData.results || geoData.results.length === 0) {
+                document.getElementById('location-name').innerText = "City not found";
+                return;
+            }
+            
+            const target = geoData.results[0];
+            fetchWeatherByCoords(target.latitude, target.longitude, `${target.name}, ${target.country}`);
+        } catch (err) {
+            document.getElementById('location-name').innerText = "Error searching city.";
+        }
+    }
+
+    // Update HTML layout dynamically
+    function updateUI(currentData, locationName) {
+        document.getElementById('location-name').innerText = locationName;
+        document.getElementById('temp-display').innerText = `${Math.round(currentData.temperature_2m)}°C`;
+        document.getElementById('wind-speed').innerText = currentData.wind_speed_10m;
+        document.getElementById('humidity').innerText = currentData.relative_humidity_2m;
+        
+        const code = currentData.weather_code;
+        document.getElementById('weather-desc').innerText = weatherCodes[code] || 'Unknown Conditions';
+    }
+</script>
+
+</body>
+</html>
